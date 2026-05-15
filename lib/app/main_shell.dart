@@ -5,11 +5,17 @@ import '../features/players/players_view.dart';
 import '../features/settings/settings_view.dart';
 
 import 'theme/theme_controller.dart';
+import '../application/controllers/player_controller.dart';
 
 class MainShell extends StatefulWidget {
   final ThemeController themeController;
+  final PlayerController playerController;
 
-  const MainShell({super.key, required this.themeController});
+  const MainShell({
+    super.key,
+    required this.themeController,
+    required this.playerController,
+  });
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -25,7 +31,7 @@ class _MainShellState extends State<MainShell> {
     super.initState();
 
     pages = [
-      const HomeView(),
+      HomeView(playerController: widget.playerController),
       const PlayersView(),
       SettingsView(themeController: widget.themeController),
     ];
