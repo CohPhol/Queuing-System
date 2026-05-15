@@ -17,6 +17,75 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
+  void _showEditDialog(Player player) {
+    final nameController = TextEditingController(text: player.name);
+
+    SkillLevel selectedSkill = player.skillLevel;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Edit Player"),
+
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: "Name"),
+              ),
+
+              const SizedBox(height: 12),
+
+              DropdownButtonFormField<SkillLevel>(
+                initialValue: selectedSkill,
+                decoration: const InputDecoration(
+                  labelText: "Skill Level",
+                  border: OutlineInputBorder(),
+                ),
+                items: SkillLevel.values.map((level) {
+                  return DropdownMenuItem(
+                    value: level,
+                    child: Text(level.label),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+
+                  setState(() {
+                    selectedSkill = value;
+                  });
+                },
+              ),
+            ],
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+                widget.playerController.updatePlayer(
+                  player.copyWith(
+                    name: nameController.text,
+                    skillLevel: selectedSkill,
+                  ),
+                );
+
+                Navigator.pop(context);
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -99,12 +168,25 @@ class _HomeViewState extends State<HomeView> {
                           return ListTile(
                             leading: const Icon(Icons.person),
                             title: Text(player.name),
-                            subtitle: Text(player.skillLevel.name),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () {
-                                widget.playerController.deletePlayer(player.id);
-                              },
+                            subtitle: Text(player.skillLevel.label),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit),
+                                  onPressed: () {
+                                    _showEditDialog(player);
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete),
+                                  onPressed: () {
+                                    widget.playerController.deletePlayer(
+                                      player.id,
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           );
                         },
