@@ -6,6 +6,8 @@ import '../../domain/models/player.dart';
 import '../../domain/enums/skill_level.dart';
 import '../../domain/enums/payment_status.dart';
 import '../../domain/enums/player_status.dart';
+import '../../domain/enums/player_availability.dart';
+import '../players/widgets/player_card.dart';
 
 class HomeView extends StatefulWidget {
   final PlayerController playerController;
@@ -17,6 +19,22 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
+  int _getCrossAxisCount(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    if (width < 1000) return 1; // mobile / narrow
+    if (width < 2000) return 2; // tablet / small desktop
+    return 3; // wide screen
+  }
+
+  double _getAspectRatio(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    if (width < 1000) return 2.6; // mobile/narrow
+    if (width < 1600) return 3.2; // normal desktop
+    return 4.0; // wide screen
+  }
+
   void _showEditDialog(Player player) {
     final nameController = TextEditingController(text: player.name);
 
@@ -93,120 +111,162 @@ class _HomeViewState extends State<HomeView> {
       child: Row(
         children: [
           // =========================
-          // LEFT: PLAYER LIST
+          // LEFT: PLAYER LIST (1/3)
           // =========================
-          Container(
-            width: 260,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Column(
-              children: [
-                // =====================
-                // ADD BUTTON
-                // =====================
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: AnimatedBuilder(
-                    animation: widget.playerController,
-                    builder: (context, _) {
-                      final count = widget.playerController.players.length;
+          Expanded(
+            flex: 1,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                children: [
+                  // ===================== HEADER =====================
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: AnimatedBuilder(
+                      animation: widget.playerController,
+                      builder: (context, _) {
+                        final count = widget.playerController.players.length;
 
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Total Players: $count",
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              widget.playerController.addPlayer(
-                                Player(
-                                  id: DateTime.now().millisecondsSinceEpoch
-                                      .toString(),
-                                  name:
-                                      "Player ${widget.playerController.players.length + 1}",
-                                  skillLevel: SkillLevel.beginner,
-                                  gamesPlayed: 0,
-                                  wins: 0,
-                                  paymentStatus: PaymentStatus.unpaid,
-                                  status: PlayerStatus.idle,
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.add),
-                            label: const Text("Add Player"),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-
-                const Divider(height: 1),
-
-                // =====================
-                // PLAYER LIST
-                // =====================
-                Expanded(
-                  child: AnimatedBuilder(
-                    animation: widget.playerController,
-                    builder: (context, _) {
-                      final players = widget.playerController.players;
-
-                      return ListView.builder(
-                        itemCount: players.length,
-                        itemBuilder: (context, index) {
-                          final player = players[index];
-
-                          return ListTile(
-                            leading: const Icon(Icons.person),
-                            title: Text(player.name),
-                            subtitle: Text(player.skillLevel.label),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
+                        return Column(
+                          children: [
+                            // ================= TOP CONTROL ROW =================
+                            Row(
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () {
-                                    _showEditDialog(player);
-                                  },
+                                // TITLE
+                                Text(
+                                  "Players ($count)",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete),
-                                  onPressed: () {
-                                    widget.playerController.deletePlayer(
-                                      player.id,
-                                    );
-                                  },
+
+                                const SizedBox(width: 12),
+
+                                // SEARCH BAR
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 32,
+                                    child: TextField(
+                                      onChanged: (value) {
+                                        // TODO: connect to controller filter
+                                      },
+                                      decoration: InputDecoration(
+                                        hintText: "Search player...",
+                                        prefixIcon: const Icon(
+                                          Icons.search,
+                                          size: 18,
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 0,
+                                            ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 8),
+
+                                // ADD BUTTON
+                                SizedBox(
+                                  height: 32,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      widget.playerController.addPlayer(
+                                        Player(
+                                          id: DateTime.now()
+                                              .millisecondsSinceEpoch
+                                              .toString(),
+                                          name:
+                                              "Player ${widget.playerController.players.length + 1}",
+                                          skillLevel: SkillLevel.beginner,
+                                          gamesPlayed: 0,
+                                          wins: 0,
+                                          paymentStatus: PaymentStatus.unpaid,
+                                          status: PlayerStatus.idle,
+                                          availability:
+                                              PlayerAvailability.present,
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text("Add"),
+                                  ),
                                 ),
                               ],
                             ),
-                          );
-                        },
-                      );
-                    },
+
+                            const SizedBox(height: 8),
+                          ],
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+
+                  const Divider(height: 1),
+
+                  // ===================== LIST =====================
+                  Expanded(
+                    child: AnimatedBuilder(
+                      animation: widget.playerController,
+                      builder: (context, _) {
+                        final players = widget.playerController.players;
+
+                        return GridView.builder(
+                          padding: EdgeInsets.all(
+                            MediaQuery.of(context).size.width < 1000 ? 4 : 6,
+                          ),
+                          itemCount: players.length,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: _getCrossAxisCount(context),
+                                mainAxisSpacing: 4,
+                                crossAxisSpacing: 4,
+                                childAspectRatio: _getAspectRatio(context),
+                              ),
+                          itemBuilder: (context, index) {
+                            final player = players[index];
+
+                            return PlayerCard(
+                              player: player,
+                              onEdit: () => _showEditDialog(player),
+                              onDelete: () => widget.playerController
+                                  .deletePlayer(player.id),
+                              onTogglePayment: () => widget.playerController
+                                  .togglePayment(player.id),
+                              onToggleAvailability: () => widget
+                                  .playerController
+                                  .toggleAvailability(player.id),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
           const SizedBox(width: 12),
 
           // =========================
-          // RIGHT SIDE (COURTS + QUEUE)
+          // RIGHT SIDE (2/3)
           // =========================
           Expanded(
+            flex: 2,
             child: Column(
               children: [
-                // COURTS
                 Expanded(
                   child: ListView(
                     children: [
@@ -219,7 +279,6 @@ class _HomeViewState extends State<HomeView> {
                           ["Team A P2", "Team B P2"],
                         ],
                       ),
-
                       OutlinedButton.icon(
                         onPressed: () {},
                         icon: const Icon(Icons.add),
@@ -231,7 +290,6 @@ class _HomeViewState extends State<HomeView> {
 
                 const SizedBox(height: 12),
 
-                // QUEUE
                 Expanded(
                   child: ListView(
                     children: [
@@ -244,7 +302,6 @@ class _HomeViewState extends State<HomeView> {
                           ["Team A P2", "Team B P2"],
                         ],
                       ),
-
                       OutlinedButton.icon(
                         onPressed: () {},
                         icon: const Icon(Icons.add),

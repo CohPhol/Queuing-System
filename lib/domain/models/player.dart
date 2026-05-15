@@ -1,6 +1,7 @@
 import 'package:queuing_system/domain/enums/payment_status.dart';
 import 'package:queuing_system/domain/enums/player_status.dart';
 import 'package:queuing_system/domain/enums/skill_level.dart';
+import 'package:queuing_system/domain/enums/player_availability.dart';
 
 class Player {
   final String id;
@@ -10,6 +11,7 @@ class Player {
   final int wins;
   final PaymentStatus paymentStatus;
   final PlayerStatus status;
+  final PlayerAvailability availability;
 
   Player({
     required this.id,
@@ -19,6 +21,7 @@ class Player {
     required this.wins,
     required this.paymentStatus,
     required this.status,
+    required this.availability,
   });
 
   Player copyWith({
@@ -29,6 +32,7 @@ class Player {
     int? wins,
     PaymentStatus? paymentStatus,
     PlayerStatus? status,
+    PlayerAvailability? availability,
   }) {
     return Player(
       id: id ?? this.id,
@@ -38,6 +42,7 @@ class Player {
       wins: wins ?? this.wins,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       status: status ?? this.status,
+      availability: availability ?? this.availability,
     );
   }
 }
