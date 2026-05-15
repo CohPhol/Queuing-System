@@ -4,8 +4,12 @@ import '../features/home/home_view.dart';
 import '../features/players/players_view.dart';
 import '../features/settings/settings_view.dart';
 
+import 'theme/theme_controller.dart';
+
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  final ThemeController themeController;
+
+  const MainShell({super.key, required this.themeController});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -14,11 +18,44 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int selectedIndex = 0;
 
-  final List<Widget> pages = const [HomeView(), PlayersView(), SettingsView()];
+  late final List<Widget> pages;
+
+  @override
+  void initState() {
+    super.initState();
+
+    pages = [
+      const HomeView(),
+      const PlayersView(),
+      SettingsView(themeController: widget.themeController),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          "Queue System",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          AnimatedBuilder(
+            animation: widget.themeController,
+            builder: (context, _) {
+              final isDark = widget.themeController.isDark;
+
+              return IconButton(
+                tooltip: "Toggle Theme",
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+                onPressed: () {
+                  widget.themeController.toggleTheme();
+                },
+              );
+            },
+          ),
+        ],
+      ),
       body: Row(
         children: [
           NavigationRail(
