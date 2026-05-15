@@ -1,6 +1,7 @@
-# queuing_system
+# Queuing-System
 
-A new Flutter project.
+A simple queuing system
+
 
 ## Getting Started
 
