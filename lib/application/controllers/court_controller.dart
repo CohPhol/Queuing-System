@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/models/court.dart';
 import '../../domain/models/player.dart';
 import '../../domain/enums/court_status.dart';
+import '../services/local_storage_service.dart';
 
 class CourtController extends ChangeNotifier {
   final List<Court> _courts = [];
@@ -11,6 +12,27 @@ class CourtController extends ChangeNotifier {
 
   int get courtCount => _courts.length;
 
+  bool _initialized = false;
+
+  Future<void> initialize() async {
+    if (_initialized) return;
+
+    final savedCourts = await LocalStorageService.loadCourts();
+
+    _courts
+      ..clear()
+      ..addAll(savedCourts);
+
+    _initialized = true;
+    notifyListeners();
+  }
+
+  Future<void> _save() async {
+    if (!_initialized) return;
+    await LocalStorageService.saveCourts(_courts);
+  }
+
+  // CREATE
   void addCourt() {
     _courts.add(
       Court(
@@ -23,22 +45,34 @@ class CourtController extends ChangeNotifier {
     );
 
     notifyListeners();
+    _save();
   }
 
+  // DELETE
   void deleteCourt(String id) {
+    final originalLength = _courts.length;
+
     _courts.removeWhere((court) => court.id == id);
+
+    if (_courts.length == originalLength) return;
+
     notifyListeners();
+    _save();
   }
 
+  // UPDATE
   void updateCourt(Court updatedCourt) {
     final index = _courts.indexWhere((court) => court.id == updatedCourt.id);
 
     if (index == -1) return;
 
     _courts[index] = _withAutoStart(updatedCourt);
+
     notifyListeners();
+    _save();
   }
 
+  // ASSIGN PLAYER
   bool assignPlayer({
     required String courtId,
     required Player player,
@@ -53,7 +87,7 @@ class CourtController extends ChangeNotifier {
     // Do not assign new players after the game starts.
     if (court.status == CourtStatus.inProgress) return false;
 
-    // Prevent a player from being assigned to more than one court.
+    // Prevent assignment to multiple courts.
     final assignedToAnotherCourt = _courts.any((existingCourt) {
       if (existingCourt.id == courtId) return false;
 
@@ -86,15 +120,12 @@ class CourtController extends ChangeNotifier {
     );
 
     notifyListeners();
+    _save();
+
     return true;
   }
 
-  /// Moves a player between court slots.
-  ///
-  /// Occupied destination: swaps the two players.
-  /// Empty destination: moves the player to the empty slot.
-  ///
-  /// Players can be rearranged after the court automatically starts.
+  // MOVE OR SWAP PLAYER BETWEEN COURT SLOTS
   bool movePlayer({
     required String courtId,
     required String playerId,
@@ -113,26 +144,22 @@ class CourtController extends ChangeNotifier {
       return false;
     }
 
-    // Always create separate mutable lists before modifying either team.
     final teamA = List<Player>.from(court.teamA);
     final teamB = List<Player>.from(court.teamB);
 
     final sourceTeam = fromTeamA ? teamA : teamB;
     final destinationTeam = toTeamA ? teamA : teamB;
 
-    // Validate the source slot.
     if (fromSlot < 0 || fromSlot >= sourceTeam.length) {
       return false;
     }
 
-    // Slots displayed by MatchCard are always 0 and 1.
     if (toSlot < 0 || toSlot > 1) {
       return false;
     }
 
     final sourcePlayer = sourceTeam[fromSlot];
 
-    // Ensure the dragged player still occupies the expected source slot.
     if (sourcePlayer.id != playerId) {
       return false;
     }
@@ -140,18 +167,13 @@ class CourtController extends ChangeNotifier {
     final destinationIsOccupied = toSlot < destinationTeam.length;
 
     if (destinationIsOccupied) {
-      // Swap by directly assigning the two positions.
-      // This is safe even when both teams are the same list.
       final destinationPlayer = destinationTeam[toSlot];
 
       sourceTeam[fromSlot] = destinationPlayer;
       destinationTeam[toSlot] = sourcePlayer;
     } else {
-      // The destination slot is empty.
       sourceTeam.removeAt(fromSlot);
 
-      // Re-evaluate the destination length after removing the source.
-      // This matters when moving within the same team.
       if (toSlot > destinationTeam.length) {
         return false;
       }
@@ -164,9 +186,12 @@ class CourtController extends ChangeNotifier {
     );
 
     notifyListeners();
+    _save();
+
     return true;
   }
 
+  // REMOVE PLAYER
   bool removePlayer({required String courtId, required String playerId}) {
     final courtIndex = _courts.indexWhere((court) => court.id == courtId);
 
@@ -193,9 +218,12 @@ class CourtController extends ChangeNotifier {
     );
 
     notifyListeners();
+    _save();
+
     return true;
   }
 
+  // AUTOMATICALLY START WHEN FOUR PLAYERS ARE ASSIGNED
   Court _withAutoStart(Court court) {
     final isFull = court.teamA.length == 2 && court.teamB.length == 2;
 
@@ -209,6 +237,7 @@ class CourtController extends ChangeNotifier {
     return court;
   }
 
+  // FIND THE SMALLEST AVAILABLE COURT NUMBER
   int _nextCourtNumber() {
     final existingNumbers = _courts
         .map((court) {

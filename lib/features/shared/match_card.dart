@@ -55,8 +55,48 @@ class MatchCard extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------
+  // THEME HELPERS
+  // ---------------------------------------------------------------
+
+  bool _isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  Color _teamBackground(BuildContext context) {
+    final isDark = _isDark(context);
+    return isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : Colors.grey.shade100;
+  }
+
+  Color _emptySlotBackground(BuildContext context) {
+    final isDark = _isDark(context);
+    return isDark ? Theme.of(context).colorScheme.surface : Colors.white;
+  }
+
+  Color _filledSlotBackground(BuildContext context) {
+    final isDark = _isDark(context);
+    return isDark
+        ? Colors.blue.shade900.withValues(alpha: 0.35)
+        : Colors.blue.shade50;
+  }
+
+  Color _slotBorderColor(BuildContext context, {required bool filled}) {
+    final isDark = _isDark(context);
+
+    if (filled) {
+      return isDark ? Colors.blue.shade700 : Colors.blue.shade200;
+    }
+
+    return isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+  }
+
+  Color _mutedTextColor(BuildContext context) =>
+      Theme.of(context).colorScheme.onSurfaceVariant;
+
+  // ---------------------------------------------------------------
   // RENAME COURT
   // ---------------------------------------------------------------
+
   Future<void> _showRenameDialog(BuildContext context) async {
     final controller = TextEditingController(text: title);
 
@@ -119,8 +159,8 @@ class MatchCard extends StatelessWidget {
 
   // ---------------------------------------------------------------
   // QUEUE CARD
-  // Keeps the existing action button.
   // ---------------------------------------------------------------
+
   Widget _buildQueueCard(BuildContext context) {
     final teamA = teams.isNotEmpty ? teams[0] : <String>[];
     final teamB = teams.length > 1 ? teams[1] : <String>[];
@@ -142,9 +182,9 @@ class MatchCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _buildNameTeam('Team A', teamA)),
+                Expanded(child: _buildNameTeam(context, 'Team A', teamA)),
                 const SizedBox(width: 8),
-                Expanded(child: _buildNameTeam('Team B', teamB)),
+                Expanded(child: _buildNameTeam(context, 'Team B', teamB)),
               ],
             ),
             const SizedBox(height: 8),
@@ -163,9 +203,11 @@ class MatchCard extends StatelessWidget {
 
   // ---------------------------------------------------------------
   // COURT CARD
-  // Compact layout without a Start Game / End Game button.
   // ---------------------------------------------------------------
+
   Widget _buildCourtCard(BuildContext context) {
+    final allSlotsFilled = teamAPlayers!.length + teamBPlayers!.length == 4;
+
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -190,8 +232,6 @@ class MatchCard extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                // EDIT COURT NAME
                 if (onRename != null)
                   IconButton(
                     tooltip: 'Rename court',
@@ -205,8 +245,7 @@ class MatchCard extends StatelessWidget {
                     ),
                     onPressed: () => _showRenameDialog(context),
                   ),
-
-                if (teamAPlayers!.length + teamBPlayers!.length == 4)
+                if (allSlotsFilled)
                   const Tooltip(
                     message: 'All four player slots are filled',
                     child: Icon(
@@ -223,6 +262,7 @@ class MatchCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _buildPlayerTeam(
+                    context: context,
                     label: 'Team A',
                     players: teamAPlayers!,
                     isTeamA: true,
@@ -231,6 +271,7 @@ class MatchCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: _buildPlayerTeam(
+                    context: context,
                     label: 'Team B',
                     players: teamBPlayers!,
                     isTeamA: false,
@@ -244,11 +285,19 @@ class MatchCard extends StatelessWidget {
     );
   }
 
-  Widget _buildNameTeam(String label, List<String> players) {
+  // ---------------------------------------------------------------
+  // QUEUE TEAM
+  // ---------------------------------------------------------------
+
+  Widget _buildNameTeam(
+    BuildContext context,
+    String label,
+    List<String> players,
+  ) {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: _teamBackground(context),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -259,7 +308,7 @@ class MatchCard extends StatelessWidget {
           if (players.isEmpty)
             Text(
               'No players assigned',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: _mutedTextColor(context), fontSize: 12),
             )
           else
             ...players.map(
@@ -273,7 +322,12 @@ class MatchCard extends StatelessWidget {
     );
   }
 
+  // ---------------------------------------------------------------
+  // COURT TEAM
+  // ---------------------------------------------------------------
+
   Widget _buildPlayerTeam({
+    required BuildContext context,
     required String label,
     required List<Player> players,
     required bool isTeamA,
@@ -281,9 +335,9 @@ class MatchCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: _teamBackground(context),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,6 +350,7 @@ class MatchCard extends StatelessWidget {
           const SizedBox(height: 6),
           for (var slot = 0; slot < 2; slot++)
             _buildPlayerSlot(
+              context: context,
               player: slot < players.length ? players[slot] : null,
               isTeamA: isTeamA,
               slot: slot,
@@ -305,7 +360,12 @@ class MatchCard extends StatelessWidget {
     );
   }
 
+  // ---------------------------------------------------------------
+  // PLAYER SLOT
+  // ---------------------------------------------------------------
+
   Widget _buildPlayerSlot({
+    required BuildContext context,
     required Player? player,
     required bool isTeamA,
     required int slot,
@@ -315,10 +375,12 @@ class MatchCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
       decoration: BoxDecoration(
-        color: player == null ? Colors.white : Colors.blue.shade50,
+        color: player == null
+            ? _emptySlotBackground(context)
+            : _filledSlotBackground(context),
         borderRadius: BorderRadius.circular(5),
         border: Border.all(
-          color: player == null ? Colors.grey.shade300 : Colors.blue.shade200,
+          color: _slotBorderColor(context, filled: player != null),
         ),
       ),
       child: Row(
@@ -326,7 +388,7 @@ class MatchCard extends StatelessWidget {
           Icon(
             player == null ? Icons.add : Icons.drag_indicator,
             size: 15,
-            color: Colors.grey.shade600,
+            color: _mutedTextColor(context),
           ),
           const SizedBox(width: 4),
           Expanded(
@@ -336,7 +398,9 @@ class MatchCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                color: player == null ? Colors.grey.shade600 : Colors.black87,
+                color: player == null
+                    ? _mutedTextColor(context)
+                    : Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
@@ -416,7 +480,10 @@ class MatchCard extends StatelessWidget {
         return DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: Colors.green, width: 2),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary,
+              width: 2,
+            ),
           ),
           child: displayedSlot,
         );
