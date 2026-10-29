@@ -3,6 +3,8 @@ import 'main_shell.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 import '../application/controllers/player_controller.dart';
+import '../application/controllers/court_controller.dart';
+import '../application/controllers/queue_controller.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -14,6 +16,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final ThemeController themeController = ThemeController();
   final PlayerController playerController = PlayerController();
+  final CourtController courtController = CourtController();
+  final QueueController queueController = QueueController();
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +32,8 @@ class _MyAppState extends State<MyApp> {
           home: MainShell(
             themeController: themeController,
             playerController: playerController,
+            courtController: courtController,
+            queueController: queueController,
           ),
         );
       },
