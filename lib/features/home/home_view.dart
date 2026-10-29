@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/models/queue_group.dart';
 import '../shared/match_card.dart';
+import '../shared/queue_card.dart';
 import '../players/widgets/player_card.dart';
 
 import '../../application/controllers/player_controller.dart';
 import '../../application/controllers/court_controller.dart';
 import '../../application/controllers/queue_controller.dart';
 
+import '../../domain/models/queue_entry.dart';
 import '../../domain/models/player.dart';
 import '../../domain/enums/skill_level.dart';
 import '../../domain/enums/payment_status.dart';
 import '../../domain/enums/player_status.dart';
 import '../../domain/enums/player_availability.dart';
+import '../../domain/enums/queue_priority.dart';
+import '../../domain/enums/queue_team.dart';
 
 class HomeView extends StatefulWidget {
   final PlayerController playerController;
@@ -99,6 +104,192 @@ class _HomeViewState extends State<HomeView> {
     }
 
     return PlayerStatus.idle;
+  }
+
+  Future<void> _confirmDeletePlayer(Player player) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete player?'),
+        content: Text(
+          'Are you sure you want to delete "${player.name}"? '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    widget.playerController.deletePlayer(player.id);
+
+    _showMessage('${player.name} deleted.');
+  }
+
+  Future<void> _confirmDeleteCourt(dynamic court) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete court?'),
+        content: Text(
+          'Delete "${court.name}" and remove its player assignments?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    widget.courtController.deleteCourt(court.id);
+
+    _showMessage('"${court.name}" deleted.');
+  }
+
+  Future<void> _confirmDeleteQueue(QueueGroup queueGroup) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete queue?'),
+        content: Text(
+          'Delete "${queueGroup.name}" and remove all players from it?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    widget.queueController.deleteQueue(queueGroup.id);
+
+    _showMessage('"${queueGroup.name}" deleted.');
+  }
+
+  void _addPlayerToQueue(
+    QueueGroup queueGroup,
+    Player player,
+    QueueTeam team,
+    int targetSlot,
+  ) {
+    final currentQueue = queueGroup.queue;
+
+    final existingEntryIndex = currentQueue.entries.indexWhere(
+      (entry) => entry.player.id == player.id,
+    );
+
+    // Player already belongs to this queue: move them to the other team.
+    if (existingEntryIndex != -1) {
+      final existingEntry = currentQueue.entries[existingEntryIndex];
+
+      if (existingEntry.team == team) {
+        _showMessage('${player.name} is already on this team.');
+        return;
+      }
+
+      final targetTeamCount = currentQueue.entries
+          .where((entry) => entry.team == team)
+          .length;
+
+      if (targetTeamCount >= 2) {
+        _showMessage('That team is already full.');
+        return;
+      }
+
+      final updatedEntries = [...currentQueue.entries];
+
+      updatedEntries[existingEntryIndex] = existingEntry.copyWith(team: team);
+
+      widget.queueController.updateQueue(
+        queueGroup.copyWith(
+          queue: currentQueue.copyWith(entries: updatedEntries),
+        ),
+      );
+
+      return;
+    }
+
+    // Do not allow a player who is already queued elsewhere to be duplicated.
+    final isQueuedElsewhere = widget.queueController.queues.any(
+      (group) =>
+          group.id != queueGroup.id &&
+          group.queue.entries.any((entry) => entry.player.id == player.id),
+    );
+
+    if (isQueuedElsewhere) {
+      _showMessage('${player.name} is already in another queue.');
+      return;
+    }
+
+    // Do not queue a player who is already playing on a court.
+    if (_isPlayerOnCourt(player)) {
+      _showMessage('${player.name} is already assigned to a court.');
+      return;
+    }
+
+    final teamCount = currentQueue.entries
+        .where((entry) => entry.team == team)
+        .length;
+
+    if (teamCount >= 2) {
+      _showMessage('That team is already full.');
+      return;
+    }
+
+    final entry = QueueEntry(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      player: player,
+      team: team,
+      priority: QueuePriority.normal,
+      createdAt: DateTime.now(),
+    );
+
+    try {
+      final updatedQueue = currentQueue.add(entry);
+
+      widget.queueController.updateQueue(
+        queueGroup.copyWith(queue: updatedQueue),
+      );
+    } on StateError catch (error) {
+      _showMessage(error.message.toString());
+    }
   }
 
   void _showEditDialog(Player player) {
@@ -200,9 +391,7 @@ class _HomeViewState extends State<HomeView> {
       player: player,
       status: status,
       onEdit: () => _showEditDialog(player),
-      onDelete: () {
-        widget.playerController.deletePlayer(player.id);
-      },
+      onDelete: () => _confirmDeletePlayer(player),
       onTogglePayment: () {
         widget.playerController.togglePayment(player.id);
       },
@@ -216,23 +405,10 @@ class _HomeViewState extends State<HomeView> {
       maxSimultaneousDrags: 1,
       feedback: Material(
         color: Colors.transparent,
-        elevation: 6,
-        child: SizedBox(
-          width: 260,
-          child: IgnorePointer(
-            child: PlayerCard(
-              player: player,
-              status: status,
-              onEdit: () {},
-              onDelete: () {},
-              onTogglePayment: () {},
-              onToggleAvailability: () {},
-            ),
-          ),
-        ),
+        child: SizedBox(width: 260, child: Opacity(opacity: 0.9, child: card)),
       ),
       childWhenDragging: Opacity(opacity: 0.35, child: card),
-      child: card,
+      child: MouseRegion(cursor: SystemMouseCursors.grab, child: card),
     );
   }
 
@@ -597,18 +773,64 @@ class _HomeViewState extends State<HomeView> {
 
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 8),
-                                    child: MatchCard(
-                                      title:
-                                          '${queueGroup.name} '
-                                          '(${playerNames.length} players)',
+                                    child: QueueCard(
+                                      title: queueGroup.name,
                                       actionText: 'Transfer to Court',
-                                      onAction: () {
-                                        _showMessage(
-                                          'Queue-to-court transfer '
-                                          'has not been implemented yet.',
+                                      teamA: queueGroup.queue.teamAEntries
+                                          .map((entry) => entry.player)
+                                          .toList(),
+                                      teamB: queueGroup.queue.teamBEntries
+                                          .map((entry) => entry.player)
+                                          .toList(),
+                                      onPlayerDropped:
+                                          (player, team, slotIndex) {
+                                            _addPlayerToQueue(
+                                              queueGroup,
+                                              player,
+                                              team,
+                                              slotIndex,
+                                            );
+                                          },
+                                      onRemovePlayer: (player, team) {
+                                        final entry = queueGroup.queue.entries
+                                            .firstWhere(
+                                              (entry) =>
+                                                  entry.player.id ==
+                                                      player.id &&
+                                                  entry.team == team,
+                                            );
+
+                                        final updatedQueue = queueGroup.queue
+                                            .remove(entry.id);
+
+                                        widget.queueController.updateQueue(
+                                          queueGroup.copyWith(
+                                            queue: updatedQueue,
+                                          ),
                                         );
                                       },
-                                      teams: [playerNames, <String>[]],
+                                      onDelete: () {
+                                        // Immediate deletion, with no confirmation dialog.
+                                        widget.queueController.deleteQueue(
+                                          queueGroup.id,
+                                        );
+                                      },
+                                      onAction: () {
+                                        if (queueGroup.queue.entries.length <
+                                            2) {
+                                          _showMessage(
+                                            'At least 2 players are required to transfer to a court.',
+                                          );
+                                          return;
+                                        }
+
+                                        // Keep your existing court-transfer implementation here.
+                                        // If transfer is not implemented yet, this button will not transfer
+                                        // players until that logic is added.
+                                        _showMessage(
+                                          'Court transfer logic still needs to be implemented.',
+                                        );
+                                      },
                                     ),
                                   );
                                 },

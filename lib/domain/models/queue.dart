@@ -1,16 +1,51 @@
 import 'queue_entry.dart';
+import 'package:queuing_system/domain/enums/queue_team.dart';
 
 class Queue {
   final List<QueueEntry> entries;
 
   Queue({required this.entries});
 
+  List<QueueEntry> get teamAEntries =>
+      entries.where((entry) => entry.team == QueueTeam.teamA).toList();
+
+  List<QueueEntry> get teamBEntries =>
+      entries.where((entry) => entry.team == QueueTeam.teamB).toList();
+
+  bool get isTeamAFull => teamAEntries.length >= 2;
+
+  bool get isTeamBFull => teamBEntries.length >= 2;
+
+  bool get isFull => isTeamAFull && isTeamBFull;
+
+  bool get isReady => teamAEntries.length == 2 && teamBEntries.length == 2;
+
   Queue add(QueueEntry entry) {
+    final teamEntries = entry.team == QueueTeam.teamA
+        ? teamAEntries
+        : teamBEntries;
+
+    if (teamEntries.length >= 2) {
+      throw StateError(
+        '${entry.team == QueueTeam.teamA ? 'Team A' : 'Team B'} is full.',
+      );
+    }
+
+    if (entries.any((existing) => existing.player.id == entry.player.id)) {
+      throw StateError('This player is already in this queue.');
+    }
+
     return Queue(entries: [...entries, entry]);
   }
 
+  Queue copyWith({List<QueueEntry>? entries}) {
+    return Queue(entries: entries ?? this.entries);
+  }
+
   Queue remove(String entryId) {
-    return Queue(entries: entries.where((e) => e.id != entryId).toList());
+    return Queue(
+      entries: entries.where((entry) => entry.id != entryId).toList(),
+    );
   }
 
   Queue reorder(int oldIndex, int newIndex) {

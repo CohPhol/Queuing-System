@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../domain/models/queue_entry.dart';
 
 import '../../domain/models/player.dart';
 import '../../domain/models/court.dart';
@@ -14,6 +15,7 @@ import '../../domain/enums/player_availability.dart';
 import '../../domain/enums/skill_level.dart';
 import '../../domain/enums/court_status.dart';
 import '../../domain/enums/queue_priority.dart';
+import '../../domain/enums/queue_team.dart';
 
 class LocalStorageService {
   LocalStorageService._();
@@ -253,6 +255,10 @@ class LocalStorageService {
       player: _playerFromJson(Map<String, dynamic>.from(json['player'] as Map)),
       priority: QueuePriority.values.byName(json['priority'] as String),
       createdAt: DateTime.parse(json['createdAt'] as String),
+      team: QueueTeam.values.firstWhere(
+        (team) => team.name == json['team'],
+        orElse: () => QueueTeam.teamA,
+      ),
     );
   }
 }

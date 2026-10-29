@@ -17,6 +17,7 @@ class MatchCard extends StatelessWidget {
 
   // Court renaming support.
   final ValueChanged<String>? onRename;
+  final VoidCallback? onDelete;
 
   final bool Function(
     Player player,
@@ -41,6 +42,7 @@ class MatchCard extends StatelessWidget {
     this.onRename,
     this.onMovePlayer,
     this.onAssignPlayer,
+    this.onDelete,
   });
 
   @override
@@ -244,6 +246,20 @@ class MatchCard extends StatelessWidget {
                       minHeight: 28,
                     ),
                     onPressed: () => _showRenameDialog(context),
+                  ),
+                if (onDelete != null)
+                  IconButton(
+                    tooltip: 'Delete court',
+                    icon: const Icon(Icons.delete_outline),
+                    iconSize: 16,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                    color: Theme.of(context).colorScheme.error,
+                    onPressed: onDelete,
                   ),
                 if (allSlotsFilled)
                   const Tooltip(

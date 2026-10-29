@@ -25,17 +25,8 @@ class PlayerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LongPressDraggable<Player>(
-      data: player,
-      feedback: Material(
-        color: Colors.transparent,
-        child: SizedBox(
-          width: 260,
-          child: _buildCard(context, isDragging: true),
-        ),
-      ),
-      child: _buildCard(context),
-    );
+    // Dragging is handled by HomeView, not by this widget.
+    return _buildCard(context);
   }
 
   Color _getStatusColor(BuildContext context) {
@@ -44,17 +35,14 @@ class PlayerCard extends StatelessWidget {
     switch (status) {
       case PlayerStatus.idle:
         return Theme.of(context).colorScheme.surface;
-
       case PlayerStatus.inQueue:
         return isDark
             ? Colors.orange.shade900.withValues(alpha: 0.35)
             : Colors.orange.shade50;
-
       case PlayerStatus.inCourt:
         return isDark
             ? Colors.blue.shade900.withValues(alpha: 0.4)
             : Colors.blue.shade50;
-
       case PlayerStatus.queuedWhilePlaying:
         return isDark
             ? Colors.purple.shade900.withValues(alpha: 0.4)
@@ -68,13 +56,10 @@ class PlayerCard extends StatelessWidget {
     switch (status) {
       case PlayerStatus.idle:
         return Theme.of(context).colorScheme.outline.withValues(alpha: 0.2);
-
       case PlayerStatus.inQueue:
         return isDark ? Colors.orange.shade700 : Colors.orange.shade300;
-
       case PlayerStatus.inCourt:
         return isDark ? Colors.blue.shade700 : Colors.blue.shade300;
-
       case PlayerStatus.queuedWhilePlaying:
         return isDark ? Colors.purple.shade700 : Colors.purple.shade300;
     }
@@ -86,13 +71,10 @@ class PlayerCard extends StatelessWidget {
     switch (status) {
       case PlayerStatus.idle:
         return Theme.of(context).colorScheme.onSurfaceVariant;
-
       case PlayerStatus.inQueue:
         return isDark ? Colors.orange.shade200 : Colors.orange.shade900;
-
       case PlayerStatus.inCourt:
         return isDark ? Colors.blue.shade200 : Colors.blue.shade900;
-
       case PlayerStatus.queuedWhilePlaying:
         return isDark ? Colors.purple.shade200 : Colors.purple.shade900;
     }
@@ -102,19 +84,16 @@ class PlayerCard extends StatelessWidget {
     switch (status) {
       case PlayerStatus.idle:
         return 'AVAILABLE';
-
       case PlayerStatus.inQueue:
         return 'QUEUED';
-
       case PlayerStatus.inCourt:
         return 'ON COURT';
-
       case PlayerStatus.queuedWhilePlaying:
         return 'COURT + QUEUED';
     }
   }
 
-  Widget _buildCard(BuildContext context, {bool isDragging = false}) {
+  Widget _buildCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isPaid = player.paymentStatus == PaymentStatus.paid;
@@ -123,9 +102,7 @@ class PlayerCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        color: isDragging
-            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.7)
-            : _getStatusColor(context),
+        color: _getStatusColor(context),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: _getStatusBorderColor(context)),
       ),
