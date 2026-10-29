@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../../../domain/models/player.dart';
-import '../../../domain/enums/skill_level.dart';
 import '../../../domain/enums/payment_status.dart';
 import '../../../domain/enums/player_availability.dart';
+import '../../../domain/enums/player_status.dart';
 
 class PlayerCard extends StatelessWidget {
   final Player player;
+  final PlayerStatus status;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onTogglePayment;
@@ -14,6 +16,7 @@ class PlayerCard extends StatelessWidget {
   const PlayerCard({
     super.key,
     required this.player,
+    this.status = PlayerStatus.idle,
     required this.onEdit,
     required this.onDelete,
     required this.onTogglePayment,
@@ -26,16 +29,94 @@ class PlayerCard extends StatelessWidget {
       data: player,
       feedback: Material(
         color: Colors.transparent,
-        child: _buildCard(context, isDragging: true),
+        child: SizedBox(
+          width: 260,
+          child: _buildCard(context, isDragging: true),
+        ),
       ),
       child: _buildCard(context),
     );
   }
 
+  Color _getStatusColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    switch (status) {
+      case PlayerStatus.idle:
+        return Theme.of(context).colorScheme.surface;
+
+      case PlayerStatus.inQueue:
+        return isDark
+            ? Colors.orange.shade900.withValues(alpha: 0.35)
+            : Colors.orange.shade50;
+
+      case PlayerStatus.inCourt:
+        return isDark
+            ? Colors.blue.shade900.withValues(alpha: 0.4)
+            : Colors.blue.shade50;
+
+      case PlayerStatus.queuedWhilePlaying:
+        return isDark
+            ? Colors.purple.shade900.withValues(alpha: 0.4)
+            : Colors.purple.shade50;
+    }
+  }
+
+  Color _getStatusBorderColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    switch (status) {
+      case PlayerStatus.idle:
+        return Theme.of(context).colorScheme.outline.withValues(alpha: 0.2);
+
+      case PlayerStatus.inQueue:
+        return isDark ? Colors.orange.shade700 : Colors.orange.shade300;
+
+      case PlayerStatus.inCourt:
+        return isDark ? Colors.blue.shade700 : Colors.blue.shade300;
+
+      case PlayerStatus.queuedWhilePlaying:
+        return isDark ? Colors.purple.shade700 : Colors.purple.shade300;
+    }
+  }
+
+  Color _getStatusTextColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    switch (status) {
+      case PlayerStatus.idle:
+        return Theme.of(context).colorScheme.onSurfaceVariant;
+
+      case PlayerStatus.inQueue:
+        return isDark ? Colors.orange.shade200 : Colors.orange.shade900;
+
+      case PlayerStatus.inCourt:
+        return isDark ? Colors.blue.shade200 : Colors.blue.shade900;
+
+      case PlayerStatus.queuedWhilePlaying:
+        return isDark ? Colors.purple.shade200 : Colors.purple.shade900;
+    }
+  }
+
+  String _getStatusLabel() {
+    switch (status) {
+      case PlayerStatus.idle:
+        return 'AVAILABLE';
+
+      case PlayerStatus.inQueue:
+        return 'QUEUED';
+
+      case PlayerStatus.inCourt:
+        return 'ON COURT';
+
+      case PlayerStatus.queuedWhilePlaying:
+        return 'COURT + QUEUED';
+    }
+  }
+
   Widget _buildCard(BuildContext context, {bool isDragging = false}) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
     final isPaid = player.paymentStatus == PaymentStatus.paid;
 
     return Container(
@@ -43,21 +124,19 @@ class PlayerCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         color: isDragging
-            ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
-            : colorScheme.surface,
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.7)
+            : _getStatusColor(context),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.12)),
+        border: Border.all(color: _getStatusBorderColor(context)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ================= TOP ROW =================
           Row(
             children: [
               Expanded(
                 child: Row(
                   children: [
-                    // ================= AVAILABILITY DOT =================
                     MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
@@ -76,11 +155,9 @@ class PlayerCard extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                    // ================= NAME =================
                     Expanded(
                       child: Text(
-                        "${player.name} (${player.skillLevel.label})",
+                        '${player.name} (${player.skillLevel})',
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
@@ -92,8 +169,8 @@ class PlayerCard extends StatelessWidget {
                   ],
                 ),
               ),
-
               IconButton(
+                tooltip: 'Edit player',
                 iconSize: 16,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -101,8 +178,9 @@ class PlayerCard extends StatelessWidget {
                 color: colorScheme.primary,
                 onPressed: onEdit,
               ),
-
+              const SizedBox(width: 6),
               IconButton(
+                tooltip: 'Delete player',
                 iconSize: 16,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -112,22 +190,34 @@ class PlayerCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 4),
-
-          // ================= BOTTOM ROW =================
           Row(
             children: [
               Expanded(
                 child: Text(
-                  "Games:${player.gamesPlayed} | Wins:${player.wins}",
+                  'Games: ${player.gamesPlayed} | Wins: ${player.wins}',
                   style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   softWrap: false,
                 ),
               ),
-
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: _getStatusTextColor(context).withValues(alpha: 0.12),
+                ),
+                child: Text(
+                  _getStatusLabel(),
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: _getStatusTextColor(context),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 5),
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
@@ -140,11 +230,11 @@ class PlayerCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(4),
                       color: isPaid
-                          ? Colors.green.withOpacity(0.15)
-                          : Colors.red.withOpacity(0.15),
+                          ? Colors.green.withValues(alpha: 0.15)
+                          : Colors.red.withValues(alpha: 0.15),
                     ),
                     child: Text(
-                      isPaid ? "PAID" : "UNPAID",
+                      isPaid ? 'PAID' : 'UNPAID',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,

@@ -32,6 +32,12 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   String _searchQuery = '';
 
+  Listenable get _playerStateListenable => Listenable.merge([
+    widget.playerController,
+    widget.courtController,
+    widget.queueController,
+  ]);
+
   int _getCrossAxisCount(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
 
@@ -54,6 +60,45 @@ class _HomeViewState extends State<HomeView> {
       ..showSnackBar(
         SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
       );
+  }
+
+  // Determine whether the player is assigned to any court.
+  bool _isPlayerOnCourt(Player player) {
+    return widget.courtController.courts.any((court) {
+      return [
+        ...court.teamA,
+        ...court.teamB,
+      ].any((courtPlayer) => courtPlayer.id == player.id);
+    });
+  }
+
+  // Determine whether the player is in any queue.
+  bool _isPlayerQueued(Player player) {
+    return widget.queueController.queues.any((queueGroup) {
+      return queueGroup.queue.entries.any(
+        (entry) => entry.player.id == player.id,
+      );
+    });
+  }
+
+  // Derive the display status without modifying or saving Player.status.
+  PlayerStatus _getPlayerCardStatus(Player player) {
+    final isOnCourt = _isPlayerOnCourt(player);
+    final isQueued = _isPlayerQueued(player);
+
+    if (isOnCourt && isQueued) {
+      return PlayerStatus.queuedWhilePlaying;
+    }
+
+    if (isOnCourt) {
+      return PlayerStatus.inCourt;
+    }
+
+    if (isQueued) {
+      return PlayerStatus.inQueue;
+    }
+
+    return PlayerStatus.idle;
   }
 
   void _showEditDialog(Player player) {
@@ -149,8 +194,11 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildDraggablePlayer(Player player) {
+    final status = _getPlayerCardStatus(player);
+
     final card = PlayerCard(
       player: player,
+      status: status,
       onEdit: () => _showEditDialog(player),
       onDelete: () {
         widget.playerController.deletePlayer(player.id);
@@ -170,10 +218,11 @@ class _HomeViewState extends State<HomeView> {
         color: Colors.transparent,
         elevation: 6,
         child: SizedBox(
-          width: 240,
+          width: 260,
           child: IgnorePointer(
             child: PlayerCard(
               player: player,
+              status: status,
               onEdit: () {},
               onDelete: () {},
               onTogglePayment: () {},
@@ -200,14 +249,11 @@ class _HomeViewState extends State<HomeView> {
       teamAPlayers: court.teamA,
       teamBPlayers: court.teamB,
       canEditTeams: true,
-
-      // Rename the court.
       onRename: (newName) {
         widget.courtController.updateCourt(court.copyWith(name: newName));
 
         _showMessage('Court renamed to "$newName".');
       },
-
       onAssignPlayer: (player, toTeamA) {
         final success = widget.courtController.assignPlayer(
           courtId: court.id,
@@ -224,7 +270,6 @@ class _HomeViewState extends State<HomeView> {
 
         return success;
       },
-
       onMovePlayer: (player, fromTeamA, fromSlot, toTeamA, toSlot) {
         return widget.courtController.movePlayer(
           courtId: court.id,
@@ -259,7 +304,7 @@ class _HomeViewState extends State<HomeView> {
                   Padding(
                     padding: const EdgeInsets.all(8),
                     child: AnimatedBuilder(
-                      animation: widget.playerController,
+                      animation: _playerStateListenable,
                       builder: (context, _) {
                         final players = widget.playerController.players;
 
@@ -336,7 +381,7 @@ class _HomeViewState extends State<HomeView> {
                   const Divider(height: 1),
                   Expanded(
                     child: AnimatedBuilder(
-                      animation: widget.playerController,
+                      animation: _playerStateListenable,
                       builder: (context, _) {
                         final players = widget.playerController.players.where((
                           player,
@@ -350,7 +395,8 @@ class _HomeViewState extends State<HomeView> {
                           return Center(
                             child: Text(
                               _searchQuery.isEmpty
-                                  ? 'No players yet.\nClick Add to create a player.'
+                                  ? 'No players yet.\n'
+                                        'Click Add to create a player.'
                                   : 'No players match your search.',
                               textAlign: TextAlign.center,
                             ),
