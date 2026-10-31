@@ -6,8 +6,8 @@ import '../../domain/models/player.dart';
 class QueueCard extends StatelessWidget {
   final String title;
   final String actionText;
-  final List<Player> teamA;
-  final List<Player> teamB;
+  final List<Player?> teamA;
+  final List<Player?> teamB;
 
   final Function(Player, QueueTeam, int) onPlayerDropped;
   final Function(Player, QueueTeam)? onRemovePlayer;
@@ -28,7 +28,8 @@ class QueueCard extends StatelessWidget {
     this.onRename,
   });
 
-  int get totalPlayers => teamA.length + teamB.length;
+  int get totalPlayers =>
+      teamA.whereType<Player>().length + teamB.whereType<Player>().length;
 
   bool _isDark(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark;
@@ -242,7 +243,7 @@ class QueueCard extends StatelessWidget {
     required BuildContext context,
     required String label,
     required QueueTeam team,
-    required List<Player> players,
+    required List<Player?> players,
   }) {
     return Container(
       padding: const EdgeInsets.all(6),
@@ -265,7 +266,7 @@ class QueueCard extends StatelessWidget {
               context: context,
               team: team,
               slotIndex: slot,
-              player: slot < players.length ? players[slot] : null,
+              player: players[slot],
             ),
         ],
       ),

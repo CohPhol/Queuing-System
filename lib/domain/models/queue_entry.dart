@@ -8,6 +8,7 @@ class QueueEntry {
   final QueuePriority priority;
   final DateTime createdAt;
   final QueueTeam team;
+  final int slotIndex;
 
   QueueEntry({
     required this.id,
@@ -15,6 +16,7 @@ class QueueEntry {
     required this.priority,
     required this.createdAt,
     required this.team,
+    this.slotIndex = 0,
   });
 
   QueueEntry copyWith({
@@ -23,6 +25,7 @@ class QueueEntry {
     QueuePriority? priority,
     DateTime? createdAt,
     QueueTeam? team,
+    int? slotIndex,
   }) {
     return QueueEntry(
       id: id ?? this.id,
@@ -30,6 +33,7 @@ class QueueEntry {
       priority: priority ?? this.priority,
       createdAt: createdAt ?? this.createdAt,
       team: team ?? this.team,
+      slotIndex: slotIndex ?? this.slotIndex,
     );
   }
 }

@@ -6,11 +6,15 @@ class Queue {
 
   Queue({required this.entries});
 
-  List<QueueEntry> get teamAEntries =>
-      entries.where((entry) => entry.team == QueueTeam.teamA).toList();
+  List<QueueEntry> get teamAEntries {
+    return entries.where((entry) => entry.team == QueueTeam.teamA).toList()
+      ..sort((a, b) => a.slotIndex.compareTo(b.slotIndex));
+  }
 
-  List<QueueEntry> get teamBEntries =>
-      entries.where((entry) => entry.team == QueueTeam.teamB).toList();
+  List<QueueEntry> get teamBEntries {
+    return entries.where((entry) => entry.team == QueueTeam.teamB).toList()
+      ..sort((a, b) => a.slotIndex.compareTo(b.slotIndex));
+  }
 
   bool get isTeamAFull => teamAEntries.length >= 2;
 
@@ -29,6 +33,10 @@ class Queue {
       throw StateError(
         '${entry.team == QueueTeam.teamA ? 'Team A' : 'Team B'} is full.',
       );
+    }
+
+    if (teamEntries.any((existing) => existing.slotIndex == entry.slotIndex)) {
+      throw StateError('This slot is already occupied.');
     }
 
     if (entries.any((existing) => existing.player.id == entry.player.id)) {

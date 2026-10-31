@@ -206,36 +206,56 @@ class _HomeViewState extends State<HomeView> {
   void _addPlayerToQueue(
     QueueGroup queueGroup,
     Player player,
-    QueueTeam team,
+    QueueTeam targetTeam,
     int targetSlot,
   ) {
     final currentQueue = queueGroup.queue;
 
-    final existingEntryIndex = currentQueue.entries.indexWhere(
+    // Find the player being dragged in the current queue.
+    final draggedEntryIndex = currentQueue.entries.indexWhere(
       (entry) => entry.player.id == player.id,
     );
 
-    // Player already belongs to this queue: move them to the other team.
-    if (existingEntryIndex != -1) {
-      final existingEntry = currentQueue.entries[existingEntryIndex];
+    // Find the player currently occupying the destination slot.
+    final targetEntryIndex = currentQueue.entries.indexWhere(
+      (entry) => entry.team == targetTeam && entry.slotIndex == targetSlot,
+    );
 
-      if (existingEntry.team == team) {
-        _showMessage('${player.name} is already on this team.');
-        return;
-      }
+    // ---------------------------------------------------------------
+    // CASE 1: PLAYER IS ALREADY IN THIS QUEUE
+    // ---------------------------------------------------------------
 
-      final targetTeamCount = currentQueue.entries
-          .where((entry) => entry.team == team)
-          .length;
+    if (draggedEntryIndex != -1) {
+      final draggedEntry = currentQueue.entries[draggedEntryIndex];
 
-      if (targetTeamCount >= 2) {
-        _showMessage('That team is already full.');
+      // Dropped onto their own slot.
+      if (draggedEntry.team == targetTeam &&
+          draggedEntry.slotIndex == targetSlot) {
         return;
       }
 
       final updatedEntries = [...currentQueue.entries];
 
-      updatedEntries[existingEntryIndex] = existingEntry.copyWith(team: team);
+      // Destination is occupied: SWAP positions.
+      if (targetEntryIndex != -1) {
+        final targetEntry = updatedEntries[targetEntryIndex];
+
+        updatedEntries[draggedEntryIndex] = draggedEntry.copyWith(
+          team: targetEntry.team,
+          slotIndex: targetEntry.slotIndex,
+        );
+
+        updatedEntries[targetEntryIndex] = targetEntry.copyWith(
+          team: draggedEntry.team,
+          slotIndex: draggedEntry.slotIndex,
+        );
+      } else {
+        // Destination is empty: MOVE to that exact slot.
+        updatedEntries[draggedEntryIndex] = draggedEntry.copyWith(
+          team: targetTeam,
+          slotIndex: targetSlot,
+        );
+      }
 
       widget.queueController.updateQueue(
         queueGroup.copyWith(
@@ -246,7 +266,10 @@ class _HomeViewState extends State<HomeView> {
       return;
     }
 
-    // Do not allow a player who is already queued elsewhere to be duplicated.
+    // ---------------------------------------------------------------
+    // CASE 2: PLAYER IS NOT IN THIS QUEUE
+    // ---------------------------------------------------------------
+
     final isQueuedElsewhere = widget.queueController.queues.any(
       (group) =>
           group.id != queueGroup.id &&
@@ -258,25 +281,22 @@ class _HomeViewState extends State<HomeView> {
       return;
     }
 
-    // Do not queue a player who is already playing on a court.
     if (_isPlayerOnCourt(player)) {
       _showMessage('${player.name} is already assigned to a court.');
       return;
     }
 
-    final teamCount = currentQueue.entries
-        .where((entry) => entry.team == team)
-        .length;
-
-    if (teamCount >= 2) {
-      _showMessage('That team is already full.');
+    // The destination must be empty for a new player.
+    if (targetEntryIndex != -1) {
+      _showMessage('That slot is already occupied.');
       return;
     }
 
     final entry = QueueEntry(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       player: player,
-      team: team,
+      team: targetTeam,
+      slotIndex: targetSlot,
       priority: QueuePriority.normal,
       createdAt: DateTime.now(),
     );
@@ -776,12 +796,33 @@ class _HomeViewState extends State<HomeView> {
                                     child: QueueCard(
                                       title: queueGroup.name,
                                       actionText: 'Transfer to Court',
-                                      teamA: queueGroup.queue.teamAEntries
-                                          .map((entry) => entry.player)
-                                          .toList(),
-                                      teamB: queueGroup.queue.teamBEntries
-                                          .map((entry) => entry.player)
-                                          .toList(),
+                                      teamA: List.generate(2, (slot) {
+                                        final matchingEntries = queueGroup
+                                            .queue
+                                            .teamAEntries
+                                            .where(
+                                              (entry) =>
+                                                  entry.slotIndex == slot,
+                                            );
+
+                                        return matchingEntries.isEmpty
+                                            ? null
+                                            : matchingEntries.first.player;
+                                      }),
+
+                                      teamB: List.generate(2, (slot) {
+                                        final matchingEntries = queueGroup
+                                            .queue
+                                            .teamBEntries
+                                            .where(
+                                              (entry) =>
+                                                  entry.slotIndex == slot,
+                                            );
+
+                                        return matchingEntries.isEmpty
+                                            ? null
+                                            : matchingEntries.first.player;
+                                      }),
                                       onPlayerDropped:
                                           (player, team, slotIndex) {
                                             _addPlayerToQueue(
