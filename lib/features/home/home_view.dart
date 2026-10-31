@@ -1011,97 +1011,95 @@ class _HomeViewState extends State<HomeView> {
                                 );
                               }
 
-                              return ListView.builder(
+                              return GridView.builder(
+                                padding: const EdgeInsets.all(4),
                                 itemCount: queues.length,
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: _getCrossAxisCount(
+                                        context,
+                                      ),
+                                      mainAxisSpacing: 8,
+                                      crossAxisSpacing: 8,
+                                      childAspectRatio: 3,
+                                    ),
                                 itemBuilder: (context, index) {
                                   final queueGroup = queues[index];
 
-                                  final playerNames = queueGroup.queue.entries
-                                      .map((entry) => entry.player.name)
-                                      .toList();
+                                  return QueueCard(
+                                    title: queueGroup.name,
+                                    actionText: 'Transfer to Court',
 
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: QueueCard(
-                                      title: queueGroup.name,
-                                      actionText: 'Transfer to Court',
-                                      teamA: List.generate(2, (slot) {
-                                        final matchingEntries = queueGroup
-                                            .queue
-                                            .teamAEntries
-                                            .where(
-                                              (entry) =>
-                                                  entry.slotIndex == slot,
-                                            );
-
-                                        return matchingEntries.isEmpty
-                                            ? null
-                                            : matchingEntries.first.player;
-                                      }),
-
-                                      teamB: List.generate(2, (slot) {
-                                        final matchingEntries = queueGroup
-                                            .queue
-                                            .teamBEntries
-                                            .where(
-                                              (entry) =>
-                                                  entry.slotIndex == slot,
-                                            );
-
-                                        return matchingEntries.isEmpty
-                                            ? null
-                                            : matchingEntries.first.player;
-                                      }),
-                                      onPlayerDropped:
-                                          (player, team, slotIndex) {
-                                            _addPlayerToQueue(
-                                              queueGroup,
-                                              player,
-                                              team,
-                                              slotIndex,
-                                            );
-                                          },
-                                      onRemovePlayer: (player, team) {
-                                        final entry = queueGroup.queue.entries
-                                            .firstWhere(
-                                              (entry) =>
-                                                  entry.player.id ==
-                                                      player.id &&
-                                                  entry.team == team,
-                                            );
-
-                                        final updatedQueue = queueGroup.queue
-                                            .remove(entry.id);
-
-                                        widget.queueController.updateQueue(
-                                          queueGroup.copyWith(
-                                            queue: updatedQueue,
-                                          ),
-                                        );
-                                      },
-                                      onDelete: () {
-                                        // Immediate deletion, with no confirmation dialog.
-                                        widget.queueController.deleteQueue(
-                                          queueGroup.id,
-                                        );
-                                      },
-                                      onAction: () {
-                                        if (queueGroup.queue.entries.length <
-                                            2) {
-                                          _showMessage(
-                                            'At least 2 players are required to transfer to a court.',
+                                    teamA: List.generate(2, (slot) {
+                                      final matchingEntries = queueGroup
+                                          .queue
+                                          .teamAEntries
+                                          .where(
+                                            (entry) => entry.slotIndex == slot,
                                           );
-                                          return;
-                                        }
 
-                                        // Keep your existing court-transfer implementation here.
-                                        // If transfer is not implemented yet, this button will not transfer
-                                        // players until that logic is added.
+                                      return matchingEntries.isEmpty
+                                          ? null
+                                          : matchingEntries.first.player;
+                                    }),
+
+                                    teamB: List.generate(2, (slot) {
+                                      final matchingEntries = queueGroup
+                                          .queue
+                                          .teamBEntries
+                                          .where(
+                                            (entry) => entry.slotIndex == slot,
+                                          );
+
+                                      return matchingEntries.isEmpty
+                                          ? null
+                                          : matchingEntries.first.player;
+                                    }),
+
+                                    onPlayerDropped: (player, team, slotIndex) {
+                                      _addPlayerToQueue(
+                                        queueGroup,
+                                        player,
+                                        team,
+                                        slotIndex,
+                                      );
+                                    },
+
+                                    onRemovePlayer: (player, team) {
+                                      final entry = queueGroup.queue.entries
+                                          .firstWhere(
+                                            (entry) =>
+                                                entry.player.id == player.id &&
+                                                entry.team == team,
+                                          );
+
+                                      widget.queueController.updateQueue(
+                                        queueGroup.copyWith(
+                                          queue: queueGroup.queue.remove(
+                                            entry.id,
+                                          ),
+                                        ),
+                                      );
+                                    },
+
+                                    onDelete: () {
+                                      widget.queueController.deleteQueue(
+                                        queueGroup.id,
+                                      );
+                                    },
+
+                                    onAction: () {
+                                      if (queueGroup.queue.entries.length < 2) {
                                         _showMessage(
-                                          'Court transfer logic still needs to be implemented.',
+                                          'At least 2 players are required to transfer to a court.',
                                         );
-                                      },
-                                    ),
+                                        return;
+                                      }
+
+                                      _showMessage(
+                                        'Court transfer logic still needs to be implemented.',
+                                      );
+                                    },
                                   );
                                 },
                               );

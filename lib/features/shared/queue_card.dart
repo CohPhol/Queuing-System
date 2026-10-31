@@ -81,41 +81,69 @@ class QueueCard extends StatelessWidget {
                 const Icon(Icons.queue, size: 18),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      IconButton(
+                        tooltip: 'Delete queue',
+                        icon: const Icon(Icons.delete_outline),
+                        iconSize: 16,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
+                        color: theme.colorScheme.error,
+                        onPressed: onDelete,
+                      ),
+                      if (onRename != null)
+                        IconButton(
+                          tooltip: 'Rename queue',
+                          icon: const Icon(Icons.edit_outlined),
+                          iconSize: 16,
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                          onPressed: () => _showRenameDialog(context),
+                        ),
+                    ],
                   ),
                 ),
-                if (onRename != null)
-                  IconButton(
-                    tooltip: 'Rename queue',
-                    icon: const Icon(Icons.edit_outlined),
-                    iconSize: 16,
+                const SizedBox(width: 8),
+                Text(
+                  '$totalPlayers/4 players',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _mutedTextColor(context),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: totalPlayers >= 2 ? onAction : null,
+                  icon: const Icon(Icons.sports_tennis, size: 15),
+                  label: Text(actionText, style: const TextStyle(fontSize: 11)),
+                  style: FilledButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 28,
-                      minHeight: 28,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
                     ),
-                    onPressed: () => _showRenameDialog(context),
                   ),
-                IconButton(
-                  tooltip: 'Delete queue',
-                  icon: const Icon(Icons.delete_outline),
-                  iconSize: 16,
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
-                  ),
-                  color: theme.colorScheme.error,
-                  onPressed: onDelete,
                 ),
               ],
             ),
@@ -138,32 +166,6 @@ class QueueCard extends StatelessWidget {
                     label: 'Team B',
                     team: QueueTeam.teamB,
                     players: teamB,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '$totalPlayers/4 players',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _mutedTextColor(context),
-                    ),
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: totalPlayers >= 2 ? onAction : null,
-                  icon: const Icon(Icons.sports_tennis, size: 15),
-                  label: Text(actionText, style: const TextStyle(fontSize: 12)),
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
                   ),
                 ),
               ],
