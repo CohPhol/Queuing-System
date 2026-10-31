@@ -6,8 +6,10 @@ class Court {
   final String name;
   final CourtStatus status;
 
-  final List<Player> teamA; // always 2 players
-  final List<Player> teamB; // always 2 players
+  // Each team always has exactly two slots.
+  // A null value represents an empty slot.
+  final List<Player?> teamA;
+  final List<Player?> teamB;
 
   final DateTime? startedAt;
 
@@ -20,12 +22,17 @@ class Court {
     this.startedAt,
   });
 
+  int get totalPlayers =>
+      teamA.whereType<Player>().length + teamB.whereType<Player>().length;
+
+  bool get isFull => totalPlayers == 4;
+
   Court copyWith({
     String? id,
     String? name,
     CourtStatus? status,
-    List<Player>? teamA,
-    List<Player>? teamB,
+    List<Player?>? teamA,
+    List<Player?>? teamB,
     DateTime? startedAt,
   }) {
     return Court(

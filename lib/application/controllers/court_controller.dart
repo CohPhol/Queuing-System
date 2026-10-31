@@ -21,10 +21,22 @@ class CourtController extends ChangeNotifier {
 
     _courts
       ..clear()
-      ..addAll(savedCourts);
+      ..addAll(
+        savedCourts.map(
+          (court) => court.copyWith(
+            teamA: _normalizeSlots(court.teamA),
+            teamB: _normalizeSlots(court.teamB),
+          ),
+        ),
+      );
 
     _initialized = true;
     notifyListeners();
+  }
+
+  // Ensure every team always has exactly two slots.
+  List<Player?> _normalizeSlots(List<Player?> players) {
+    return [for (var i = 0; i < 2; i++) i < players.length ? players[i] : null];
   }
 
   Future<void> _save() async {
@@ -39,8 +51,8 @@ class CourtController extends ChangeNotifier {
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         name: 'Court ${_nextCourtNumber()}',
         status: CourtStatus.empty,
-        teamA: [],
-        teamB: [],
+        teamA: [null, null],
+        teamB: [null, null],
       ),
     );
 
@@ -66,7 +78,12 @@ class CourtController extends ChangeNotifier {
 
     if (index == -1) return;
 
-    _courts[index] = _withAutoStart(updatedCourt);
+    final normalizedCourt = updatedCourt.copyWith(
+      teamA: _normalizeSlots(updatedCourt.teamA),
+      teamB: _normalizeSlots(updatedCourt.teamB),
+    );
+
+    _courts[index] = _withAutoStart(normalizedCourt);
 
     notifyListeners();
     _save();
@@ -77,6 +94,7 @@ class CourtController extends ChangeNotifier {
     required String courtId,
     required Player player,
     required bool toTeamA,
+    required int toSlot,
   }) {
     final courtIndex = _courts.indexWhere((court) => court.id == courtId);
 
@@ -87,33 +105,35 @@ class CourtController extends ChangeNotifier {
     // Do not assign new players after the game starts.
     if (court.status == CourtStatus.inProgress) return false;
 
+    if (toSlot < 0 || toSlot > 1) return false;
+
     // Prevent assignment to multiple courts.
     final assignedToAnotherCourt = _courts.any((existingCourt) {
       if (existingCourt.id == courtId) return false;
 
-      return [
-        ...existingCourt.teamA,
-        ...existingCourt.teamB,
-      ].any((existingPlayer) => existingPlayer.id == player.id);
+      return [...existingCourt.teamA, ...existingCourt.teamB]
+          .whereType<Player>()
+          .any((existingPlayer) => existingPlayer.id == player.id);
     });
 
     if (assignedToAnotherCourt) return false;
 
     // Prevent duplicate assignments on the same court.
-    if ([
-      ...court.teamA,
-      ...court.teamB,
-    ].any((existingPlayer) => existingPlayer.id == player.id)) {
-      return false;
-    }
+    final alreadyOnThisCourt = [...court.teamA, ...court.teamB]
+        .whereType<Player>()
+        .any((existingPlayer) => existingPlayer.id == player.id);
 
-    final teamA = List<Player>.from(court.teamA);
-    final teamB = List<Player>.from(court.teamB);
+    if (alreadyOnThisCourt) return false;
+
+    final teamA = List<Player?>.from(court.teamA);
+    final teamB = List<Player?>.from(court.teamB);
+
     final targetTeam = toTeamA ? teamA : teamB;
 
-    if (targetTeam.length >= 2) return false;
+    // The exact destination slot must be empty.
+    if (targetTeam[toSlot] != null) return false;
 
-    targetTeam.add(player);
+    targetTeam[toSlot] = player;
 
     _courts[courtIndex] = _withAutoStart(
       court.copyWith(teamA: teamA, teamB: teamB),
@@ -140,45 +160,36 @@ class CourtController extends ChangeNotifier {
 
     final court = _courts[courtIndex];
 
+    if (fromSlot < 0 || fromSlot > 1) return false;
+    if (toSlot < 0 || toSlot > 1) return false;
+
     if (fromTeamA == toTeamA && fromSlot == toSlot) {
       return false;
     }
 
-    final teamA = List<Player>.from(court.teamA);
-    final teamB = List<Player>.from(court.teamB);
+    final teamA = List<Player?>.from(court.teamA);
+    final teamB = List<Player?>.from(court.teamB);
 
     final sourceTeam = fromTeamA ? teamA : teamB;
     final destinationTeam = toTeamA ? teamA : teamB;
 
-    if (fromSlot < 0 || fromSlot >= sourceTeam.length) {
-      return false;
-    }
-
-    if (toSlot < 0 || toSlot > 1) {
-      return false;
-    }
-
     final sourcePlayer = sourceTeam[fromSlot];
 
-    if (sourcePlayer.id != playerId) {
+    if (sourcePlayer == null || sourcePlayer.id != playerId) {
       return false;
     }
 
-    final destinationIsOccupied = toSlot < destinationTeam.length;
+    final destinationPlayer = destinationTeam[toSlot];
 
-    if (destinationIsOccupied) {
-      final destinationPlayer = destinationTeam[toSlot];
-
+    // If destination is occupied, swap the two players.
+    if (destinationPlayer != null) {
       sourceTeam[fromSlot] = destinationPlayer;
       destinationTeam[toSlot] = sourcePlayer;
     } else {
-      sourceTeam.removeAt(fromSlot);
-
-      if (toSlot > destinationTeam.length) {
-        return false;
-      }
-
-      destinationTeam.insert(toSlot, sourcePlayer);
+      // If destination is empty, move the player and leave
+      // the original slot empty.
+      sourceTeam[fromSlot] = null;
+      destinationTeam[toSlot] = sourcePlayer;
     }
 
     _courts[courtIndex] = _withAutoStart(
@@ -201,14 +212,24 @@ class CourtController extends ChangeNotifier {
 
     if (court.status == CourtStatus.inProgress) return false;
 
-    final teamA = court.teamA.where((player) => player.id != playerId).toList();
+    final teamA = List<Player?>.from(court.teamA);
+    final teamB = List<Player?>.from(court.teamB);
 
-    final teamB = court.teamB.where((player) => player.id != playerId).toList();
+    var removed = false;
 
-    if (teamA.length == court.teamA.length &&
-        teamB.length == court.teamB.length) {
-      return false;
+    for (var i = 0; i < 2; i++) {
+      if (teamA[i]?.id == playerId) {
+        teamA[i] = null;
+        removed = true;
+      }
+
+      if (teamB[i]?.id == playerId) {
+        teamB[i] = null;
+        removed = true;
+      }
     }
+
+    if (!removed) return false;
 
     _courts[courtIndex] = court.copyWith(
       teamA: teamA,
@@ -225,7 +246,9 @@ class CourtController extends ChangeNotifier {
 
   // AUTOMATICALLY START WHEN FOUR PLAYERS ARE ASSIGNED
   Court _withAutoStart(Court court) {
-    final isFull = court.teamA.length == 2 && court.teamB.length == 2;
+    final isFull =
+        court.teamA.whereType<Player>().length == 2 &&
+        court.teamB.whereType<Player>().length == 2;
 
     if (isFull && court.status != CourtStatus.inProgress) {
       return court.copyWith(

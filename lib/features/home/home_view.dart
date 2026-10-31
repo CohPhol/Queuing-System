@@ -73,7 +73,7 @@ class _HomeViewState extends State<HomeView> {
       return [
         ...court.teamA,
         ...court.teamB,
-      ].any((courtPlayer) => courtPlayer.id == player.id);
+      ].whereType<Player>().any((courtPlayer) => courtPlayer.id == player.id);
     });
   }
 
@@ -450,17 +450,19 @@ class _HomeViewState extends State<HomeView> {
 
         _showMessage('Court renamed to "$newName".');
       },
-      onAssignPlayer: (player, toTeamA) {
+      onAssignPlayer: (player, toTeamA, toSlot) {
         final success = widget.courtController.assignPlayer(
           courtId: court.id,
           player: player,
           toTeamA: toTeamA,
+          toSlot: toSlot,
         );
 
         if (!success) {
           _showMessage(
-            'Cannot assign player. Check whether the court or team is full, '
-            'or whether the player is already assigned to a court.',
+            'Cannot assign player. Check whether the destination slot is '
+            'occupied, the court has started, or the player is already '
+            'assigned to another court.',
           );
         }
 
@@ -476,6 +478,7 @@ class _HomeViewState extends State<HomeView> {
           toSlot: toSlot,
         );
       },
+      onDelete: () => _confirmDeleteCourt(court),
     );
   }
 

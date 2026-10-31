@@ -11,8 +11,8 @@ class MatchCard extends StatelessWidget {
   final List<List<String>> teams;
 
   // Court-card support.
-  final List<Player>? teamAPlayers;
-  final List<Player>? teamBPlayers;
+  final List<Player?>? teamAPlayers;
+  final List<Player?>? teamBPlayers;
   final bool canEditTeams;
 
   // Court renaming support.
@@ -28,7 +28,7 @@ class MatchCard extends StatelessWidget {
   )?
   onMovePlayer;
 
-  final bool Function(Player player, bool toTeamA)? onAssignPlayer;
+  final bool Function(Player player, bool toTeamA, int toSlot)? onAssignPlayer;
 
   const MatchCard({
     super.key,
@@ -208,7 +208,10 @@ class MatchCard extends StatelessWidget {
   // ---------------------------------------------------------------
 
   Widget _buildCourtCard(BuildContext context) {
-    final allSlotsFilled = teamAPlayers!.length + teamBPlayers!.length == 4;
+    final allSlotsFilled =
+        teamAPlayers!.whereType<Player>().length +
+            teamBPlayers!.whereType<Player>().length ==
+        4;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -345,7 +348,7 @@ class MatchCard extends StatelessWidget {
   Widget _buildPlayerTeam({
     required BuildContext context,
     required String label,
-    required List<Player> players,
+    required List<Player?> players,
     required bool isTeamA,
   }) {
     return Container(
@@ -367,7 +370,7 @@ class MatchCard extends StatelessWidget {
           for (var slot = 0; slot < 2; slot++)
             _buildPlayerSlot(
               context: context,
-              player: slot < players.length ? players[slot] : null,
+              player: players[slot],
               isTeamA: isTeamA,
               slot: slot,
             ),
@@ -445,47 +448,41 @@ class MatchCard extends StatelessWidget {
         if (!canEditTeams) return false;
 
         final draggedPlayer = details.data;
-        final existingPlayers = [...?teamAPlayers, ...?teamBPlayers];
 
-        // Allow players already on this court to move between slots.
-        if (onMovePlayer != null &&
-            existingPlayers.any((p) => p.id == draggedPlayer.id)) {
-          return true;
-        }
-
-        // Allow players from the player list to enter this court.
-        return onAssignPlayer != null;
-      },
-      onAcceptWithDetails: (details) {
-        final draggedPlayer = details.data;
-        final existingPlayers = [...?teamAPlayers, ...?teamBPlayers];
+        final existingPlayers = [
+          ...?teamAPlayers?.whereType<Player>(),
+          ...?teamBPlayers?.whereType<Player>(),
+        ];
 
         final isAlreadyInThisCourt = existingPlayers.any(
           (p) => p.id == draggedPlayer.id,
         );
 
+        // Players already assigned to this court can move between slots.
         if (isAlreadyInThisCourt) {
-          final sourceTeamA = teamAPlayers!.indexWhere(
-            (p) => p.id == draggedPlayer.id,
-          );
+          return onMovePlayer != null;
+        }
 
-          final sourceTeamB = teamBPlayers!.indexWhere(
-            (p) => p.id == draggedPlayer.id,
-          );
+        // Players from the player list can enter this court.
+        return onAssignPlayer != null;
+      },
+      onAcceptWithDetails: (details) {
+        final draggedPlayer = details.data;
 
-          if (sourceTeamA != -1) {
-            onMovePlayer?.call(draggedPlayer, true, sourceTeamA, isTeamA, slot);
-          } else if (sourceTeamB != -1) {
-            onMovePlayer?.call(
-              draggedPlayer,
-              false,
-              sourceTeamB,
-              isTeamA,
-              slot,
-            );
-          }
+        final sourceTeamA = teamAPlayers!.indexWhere(
+          (p) => p?.id == draggedPlayer.id,
+        );
+
+        final sourceTeamB = teamBPlayers!.indexWhere(
+          (p) => p?.id == draggedPlayer.id,
+        );
+
+        if (sourceTeamA != -1) {
+          onMovePlayer?.call(draggedPlayer, true, sourceTeamA, isTeamA, slot);
+        } else if (sourceTeamB != -1) {
+          onMovePlayer?.call(draggedPlayer, false, sourceTeamB, isTeamA, slot);
         } else {
-          onAssignPlayer?.call(draggedPlayer, isTeamA);
+          onAssignPlayer?.call(draggedPlayer, isTeamA, slot);
         }
       },
       builder: (context, candidateData, rejectedData) {

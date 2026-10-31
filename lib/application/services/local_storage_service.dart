@@ -184,8 +184,13 @@ class LocalStorageService {
       'id': court.id,
       'name': court.name,
       'status': court.status.name,
-      'teamA': court.teamA.map(_playerToJson).toList(),
-      'teamB': court.teamB.map(_playerToJson).toList(),
+      'teamA': court.teamA.map((player) {
+        return player == null ? null : _playerToJson(player);
+      }).toList(),
+
+      'teamB': court.teamB.map((player) {
+        return player == null ? null : _playerToJson(player);
+      }).toList(),
       'startedAt': court.startedAt?.toIso8601String(),
     };
   }
@@ -195,16 +200,19 @@ class LocalStorageService {
       id: json['id'] as String,
       name: json['name'] as String,
       status: CourtStatus.values.byName(json['status'] as String),
-      teamA: (json['teamA'] as List<dynamic>)
+      teamA: (json['teamA'] as List<dynamic>? ?? [])
           .map(
-            (player) =>
-                _playerFromJson(Map<String, dynamic>.from(player as Map)),
+            (item) => item == null
+                ? null
+                : _playerFromJson(item as Map<String, dynamic>),
           )
           .toList(),
-      teamB: (json['teamB'] as List<dynamic>)
+
+      teamB: (json['teamB'] as List<dynamic>? ?? [])
           .map(
-            (player) =>
-                _playerFromJson(Map<String, dynamic>.from(player as Map)),
+            (item) => item == null
+                ? null
+                : _playerFromJson(item as Map<String, dynamic>),
           )
           .toList(),
       startedAt: json['startedAt'] == null
