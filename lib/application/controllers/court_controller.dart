@@ -89,7 +89,7 @@ class CourtController extends ChangeNotifier {
     _save();
   }
 
-  // ASSIGN PLAYER
+  // ASSIGN OR REPLACE PLAYER
   bool assignPlayer({
     required String courtId,
     required Player player,
@@ -99,40 +99,26 @@ class CourtController extends ChangeNotifier {
     final courtIndex = _courts.indexWhere((court) => court.id == courtId);
 
     if (courtIndex == -1) return false;
-
-    final court = _courts[courtIndex];
-
-    // Do not assign new players after the game starts.
-    if (court.status == CourtStatus.inProgress) return false;
-
     if (toSlot < 0 || toSlot > 1) return false;
 
-    // Prevent assignment to multiple courts.
-    final assignedToAnotherCourt = _courts.any((existingCourt) {
-      if (existingCourt.id == courtId) return false;
-
-      return [...existingCourt.teamA, ...existingCourt.teamB]
-          .whereType<Player>()
-          .any((existingPlayer) => existingPlayer.id == player.id);
-    });
-
-    if (assignedToAnotherCourt) return false;
-
-    // Prevent duplicate assignments on the same court.
-    final alreadyOnThisCourt = [...court.teamA, ...court.teamB]
-        .whereType<Player>()
-        .any((existingPlayer) => existingPlayer.id == player.id);
-
-    if (alreadyOnThisCourt) return false;
+    final court = _courts[courtIndex];
 
     final teamA = List<Player?>.from(court.teamA);
     final teamB = List<Player?>.from(court.teamB);
 
     final targetTeam = toTeamA ? teamA : teamB;
 
-    // The exact destination slot must be empty.
-    if (targetTeam[toSlot] != null) return false;
+    // Prevent assigning a player already on any court.
+    final alreadyAssigned = _courts.any((existingCourt) {
+      return [...existingCourt.teamA, ...existingCourt.teamB]
+          .whereType<Player>()
+          .any((existingPlayer) => existingPlayer.id == player.id);
+    });
 
+    if (alreadyAssigned) return false;
+
+    // Assign player to the destination slot.
+    // An existing player in that slot will be replaced.
     targetTeam[toSlot] = player;
 
     _courts[courtIndex] = _withAutoStart(
@@ -158,14 +144,14 @@ class CourtController extends ChangeNotifier {
 
     if (courtIndex == -1) return false;
 
-    final court = _courts[courtIndex];
-
     if (fromSlot < 0 || fromSlot > 1) return false;
     if (toSlot < 0 || toSlot > 1) return false;
 
     if (fromTeamA == toTeamA && fromSlot == toSlot) {
       return false;
     }
+
+    final court = _courts[courtIndex];
 
     final teamA = List<Player?>.from(court.teamA);
     final teamB = List<Player?>.from(court.teamB);
@@ -181,13 +167,12 @@ class CourtController extends ChangeNotifier {
 
     final destinationPlayer = destinationTeam[toSlot];
 
-    // If destination is occupied, swap the two players.
     if (destinationPlayer != null) {
+      // Swap occupied slots.
       sourceTeam[fromSlot] = destinationPlayer;
       destinationTeam[toSlot] = sourcePlayer;
     } else {
-      // If destination is empty, move the player and leave
-      // the original slot empty.
+      // Move to an empty slot without compacting.
       sourceTeam[fromSlot] = null;
       destinationTeam[toSlot] = sourcePlayer;
     }
@@ -210,8 +195,6 @@ class CourtController extends ChangeNotifier {
 
     final court = _courts[courtIndex];
 
-    if (court.status == CourtStatus.inProgress) return false;
-
     final teamA = List<Player?>.from(court.teamA);
     final teamB = List<Player?>.from(court.teamB);
 
@@ -231,11 +214,17 @@ class CourtController extends ChangeNotifier {
 
     if (!removed) return false;
 
+    // Preserve in-progress status and original start time.
+    // Only reset the court if it was not already in progress.
     _courts[courtIndex] = court.copyWith(
       teamA: teamA,
       teamB: teamB,
-      status: CourtStatus.empty,
-      startedAt: null,
+      status: court.status == CourtStatus.inProgress
+          ? CourtStatus.inProgress
+          : CourtStatus.empty,
+      startedAt: court.status == CourtStatus.inProgress
+          ? court.startedAt
+          : null,
     );
 
     notifyListeners();
@@ -244,7 +233,8 @@ class CourtController extends ChangeNotifier {
     return true;
   }
 
-  // AUTOMATICALLY START WHEN FOUR PLAYERS ARE ASSIGNED
+  // AUTOMATICALLY START WHEN FOUR PLAYERS ARE ASSIGNED.
+  // Never reset an already-running game.
   Court _withAutoStart(Court court) {
     final isFull =
         court.teamA.whereType<Player>().length == 2 &&

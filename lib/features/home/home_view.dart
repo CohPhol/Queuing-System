@@ -9,6 +9,7 @@ import '../../application/controllers/player_controller.dart';
 import '../../application/controllers/court_controller.dart';
 import '../../application/controllers/queue_controller.dart';
 
+import '../../domain/models/court.dart';
 import '../../domain/models/queue_entry.dart';
 import '../../domain/models/player.dart';
 import '../../domain/enums/skill_level.dart';
@@ -55,6 +56,80 @@ class _HomeViewState extends State<HomeView> {
 
     if (width < 1300) return 5.5;
     return 3.2;
+  }
+
+  bool _assignPlayerToCourt({
+    required Court destinationCourt,
+    required Player player,
+    required bool toTeamA,
+    required int toSlot,
+  }) {
+    if (toSlot < 0 || toSlot > 1) return false;
+
+    final sourceQueue = _findQueueLocation(player.id);
+    final sourceCourt = _findCourtLocation(player.id);
+
+    final targetTeam = toTeamA
+        ? destinationCourt.teamA
+        : destinationCourt.teamB;
+
+    final targetPlayer = targetTeam[toSlot];
+
+    // ---------------------------------------------------------------
+    // CASE 1: PLAYER IS ALREADY ON THIS COURT
+    // ---------------------------------------------------------------
+
+    if (sourceCourt?.court.id == destinationCourt.id) {
+      return widget.courtController.movePlayer(
+        courtId: destinationCourt.id,
+        playerId: player.id,
+        fromTeamA: sourceCourt!.teamA,
+        fromSlot: sourceCourt.slot,
+        toTeamA: toTeamA,
+        toSlot: toSlot,
+      );
+    }
+
+    // ---------------------------------------------------------------
+    // CASE 2: PLAYER COMES FROM ANOTHER COURT
+    // ---------------------------------------------------------------
+
+    if (sourceCourt != null) {
+      _replaceCourtSlot(
+        sourceCourt.court,
+        sourceCourt.teamA,
+        sourceCourt.slot,
+        targetPlayer,
+      );
+
+      _replaceCourtSlot(destinationCourt, toTeamA, toSlot, player);
+
+      return true;
+    }
+
+    // ---------------------------------------------------------------
+    // CASE 3: PLAYER COMES FROM A QUEUE
+    // ---------------------------------------------------------------
+
+    if (sourceQueue != null) {
+      _replaceQueueEntryPlayer(
+        sourceQueue.group,
+        sourceQueue.entry,
+        targetPlayer,
+      );
+
+      _replaceCourtSlot(destinationCourt, toTeamA, toSlot, player);
+
+      return true;
+    }
+
+    // ---------------------------------------------------------------
+    // CASE 4: PLAYER COMES FROM THE PLAYER LIST
+    // ---------------------------------------------------------------
+
+    _replaceCourtSlot(destinationCourt, toTeamA, toSlot, player);
+
+    return true;
   }
 
   void _showMessage(String message) {
@@ -203,55 +278,133 @@ class _HomeViewState extends State<HomeView> {
     _showMessage('"${queueGroup.name}" deleted.');
   }
 
+  // Find the queue entry containing a player.
+  ({QueueGroup group, QueueEntry entry})? _findQueueLocation(String playerId) {
+    for (final group in widget.queueController.queues) {
+      for (final entry in group.queue.entries) {
+        if (entry.player.id == playerId) {
+          return (group: group, entry: entry);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Find the court slot containing a player.
+  ({Court court, bool teamA, int slot})? _findCourtLocation(String playerId) {
+    for (final court in widget.courtController.courts) {
+      for (var slot = 0; slot < 2; slot++) {
+        if (court.teamA[slot]?.id == playerId) {
+          return (court: court, teamA: true, slot: slot);
+        }
+
+        if (court.teamB[slot]?.id == playerId) {
+          return (court: court, teamA: false, slot: slot);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Update a specific queue entry's player while preserving its metadata.
+  void _replaceQueueEntryPlayer(
+    QueueGroup group,
+    QueueEntry entry,
+    Player? player,
+  ) {
+    final updatedEntries = [...group.queue.entries];
+
+    if (player == null) {
+      updatedEntries.removeWhere((item) => item.id == entry.id);
+    } else {
+      final index = updatedEntries.indexWhere((item) => item.id == entry.id);
+
+      if (index == -1) return;
+
+      updatedEntries[index] = entry.copyWith(player: player);
+    }
+
+    widget.queueController.updateQueue(
+      group.copyWith(queue: group.queue.copyWith(entries: updatedEntries)),
+    );
+  }
+
+  // Update one court slot without changing its other slots.
+  void _replaceCourtSlot(Court court, bool teamA, int slot, Player? player) {
+    final updatedTeamA = List<Player?>.from(court.teamA);
+    final updatedTeamB = List<Player?>.from(court.teamB);
+
+    if (teamA) {
+      updatedTeamA[slot] = player;
+    } else {
+      updatedTeamB[slot] = player;
+    }
+
+    widget.courtController.updateCourt(
+      court.copyWith(teamA: updatedTeamA, teamB: updatedTeamB),
+    );
+  }
+
   void _addPlayerToQueue(
     QueueGroup queueGroup,
     Player player,
     QueueTeam targetTeam,
     int targetSlot,
   ) {
-    final currentQueue = queueGroup.queue;
+    if (targetSlot < 0 || targetSlot > 1) return;
 
-    // Find the player being dragged in the current queue.
-    final draggedEntryIndex = currentQueue.entries.indexWhere(
-      (entry) => entry.player.id == player.id,
+    final targetQueue = queueGroup.queue;
+
+    final sourceQueue = _findQueueLocation(player.id);
+    final sourceCourt = _findCourtLocation(player.id);
+
+    final targetEntry = targetQueue.entries.cast<QueueEntry?>().firstWhere(
+      (entry) => entry?.team == targetTeam && entry?.slotIndex == targetSlot,
+      orElse: () => null,
     );
 
-    // Find the player currently occupying the destination slot.
-    final targetEntryIndex = currentQueue.entries.indexWhere(
-      (entry) => entry.team == targetTeam && entry.slotIndex == targetSlot,
-    );
+    final targetPlayer = targetEntry?.player;
 
     // ---------------------------------------------------------------
-    // CASE 1: PLAYER IS ALREADY IN THIS QUEUE
+    // CASE 1: PLAYER IS ALREADY IN THE SAME QUEUE
     // ---------------------------------------------------------------
 
-    if (draggedEntryIndex != -1) {
-      final draggedEntry = currentQueue.entries[draggedEntryIndex];
+    if (sourceQueue?.group.id == queueGroup.id) {
+      final sourceEntry = sourceQueue!.entry;
 
-      // Dropped onto their own slot.
-      if (draggedEntry.team == targetTeam &&
-          draggedEntry.slotIndex == targetSlot) {
+      if (sourceEntry.team == targetTeam &&
+          sourceEntry.slotIndex == targetSlot) {
         return;
       }
 
-      final updatedEntries = [...currentQueue.entries];
+      final updatedEntries = [...targetQueue.entries];
 
-      // Destination is occupied: SWAP positions.
-      if (targetEntryIndex != -1) {
-        final targetEntry = updatedEntries[targetEntryIndex];
+      final sourceIndex = updatedEntries.indexWhere(
+        (entry) => entry.id == sourceEntry.id,
+      );
 
-        updatedEntries[draggedEntryIndex] = draggedEntry.copyWith(
+      if (sourceIndex == -1) return;
+
+      if (targetEntry != null) {
+        final targetIndex = updatedEntries.indexWhere(
+          (entry) => entry.id == targetEntry.id,
+        );
+
+        if (targetIndex == -1) return;
+
+        updatedEntries[sourceIndex] = sourceEntry.copyWith(
           team: targetEntry.team,
           slotIndex: targetEntry.slotIndex,
         );
 
-        updatedEntries[targetEntryIndex] = targetEntry.copyWith(
-          team: draggedEntry.team,
-          slotIndex: draggedEntry.slotIndex,
+        updatedEntries[targetIndex] = targetEntry.copyWith(
+          team: sourceEntry.team,
+          slotIndex: sourceEntry.slotIndex,
         );
       } else {
-        // Destination is empty: MOVE to that exact slot.
-        updatedEntries[draggedEntryIndex] = draggedEntry.copyWith(
+        updatedEntries[sourceIndex] = sourceEntry.copyWith(
           team: targetTeam,
           slotIndex: targetSlot,
         );
@@ -259,7 +412,7 @@ class _HomeViewState extends State<HomeView> {
 
       widget.queueController.updateQueue(
         queueGroup.copyWith(
-          queue: currentQueue.copyWith(entries: updatedEntries),
+          queue: targetQueue.copyWith(entries: updatedEntries),
         ),
       );
 
@@ -267,28 +420,109 @@ class _HomeViewState extends State<HomeView> {
     }
 
     // ---------------------------------------------------------------
-    // CASE 2: PLAYER IS NOT IN THIS QUEUE
+    // CASE 2: PLAYER COMES FROM ANOTHER QUEUE
     // ---------------------------------------------------------------
 
-    final isQueuedElsewhere = widget.queueController.queues.any(
-      (group) =>
-          group.id != queueGroup.id &&
-          group.queue.entries.any((entry) => entry.player.id == player.id),
-    );
+    if (sourceQueue != null) {
+      final sourceGroup = sourceQueue.group;
+      final sourceEntry = sourceQueue.entry;
 
-    if (isQueuedElsewhere) {
-      _showMessage('${player.name} is already in another queue.');
+      final sourceEntries = [...sourceGroup.queue.entries];
+
+      if (targetEntry != null) {
+        // Swap players while preserving each entry's metadata.
+        final sourceIndex = sourceEntries.indexWhere(
+          (entry) => entry.id == sourceEntry.id,
+        );
+
+        sourceEntries[sourceIndex] = sourceEntry.copyWith(
+          player: targetPlayer!,
+        );
+
+        final targetEntries = [...targetQueue.entries];
+        final targetIndex = targetEntries.indexWhere(
+          (entry) => entry.id == targetEntry.id,
+        );
+
+        targetEntries[targetIndex] = targetEntry.copyWith(player: player);
+
+        widget.queueController.updateQueue(
+          sourceGroup.copyWith(
+            queue: sourceGroup.queue.copyWith(entries: sourceEntries),
+          ),
+        );
+
+        widget.queueController.updateQueue(
+          queueGroup.copyWith(
+            queue: targetQueue.copyWith(entries: targetEntries),
+          ),
+        );
+      } else {
+        // Move the entry and preserve its metadata.
+        sourceEntries.removeWhere((entry) => entry.id == sourceEntry.id);
+
+        final destinationEntries = [
+          ...targetQueue.entries,
+          sourceEntry.copyWith(team: targetTeam, slotIndex: targetSlot),
+        ];
+
+        widget.queueController.updateQueue(
+          sourceGroup.copyWith(
+            queue: sourceGroup.queue.copyWith(entries: sourceEntries),
+          ),
+        );
+
+        widget.queueController.updateQueue(
+          queueGroup.copyWith(
+            queue: targetQueue.copyWith(entries: destinationEntries),
+          ),
+        );
+      }
+
       return;
     }
 
-    if (_isPlayerOnCourt(player)) {
-      _showMessage('${player.name} is already assigned to a court.');
+    // ---------------------------------------------------------------
+    // CASE 3: PLAYER COMES FROM A COURT
+    // ---------------------------------------------------------------
+
+    if (sourceCourt != null) {
+      // Court → Queue is a COPY, not a move.
+      // The player remains assigned to their court.
+
+      if (targetEntry != null) {
+        // Replace the existing queue player.
+        _replaceQueueEntryPlayer(queueGroup, targetEntry, player);
+      } else {
+        // Add a new queue entry.
+        final entry = QueueEntry(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          player: player,
+          team: targetTeam,
+          slotIndex: targetSlot,
+          priority: QueuePriority.normal,
+          createdAt: DateTime.now(),
+        );
+
+        widget.queueController.updateQueue(
+          queueGroup.copyWith(
+            queue: targetQueue.copyWith(
+              entries: [...targetQueue.entries, entry],
+            ),
+          ),
+        );
+      }
+
+      _showMessage('${player.name} added to queue. They remain on court.');
+
       return;
     }
+    // ---------------------------------------------------------------
+    // CASE 4: PLAYER COMES FROM THE PLAYER LIST
+    // ---------------------------------------------------------------
 
-    // The destination must be empty for a new player.
-    if (targetEntryIndex != -1) {
-      _showMessage('That slot is already occupied.');
+    if (targetEntry != null) {
+      _replaceQueueEntryPlayer(queueGroup, targetEntry, player);
       return;
     }
 
@@ -301,15 +535,11 @@ class _HomeViewState extends State<HomeView> {
       createdAt: DateTime.now(),
     );
 
-    try {
-      final updatedQueue = currentQueue.add(entry);
-
-      widget.queueController.updateQueue(
-        queueGroup.copyWith(queue: updatedQueue),
-      );
-    } on StateError catch (error) {
-      _showMessage(error.message.toString());
-    }
+    widget.queueController.updateQueue(
+      queueGroup.copyWith(
+        queue: targetQueue.copyWith(entries: [...targetQueue.entries, entry]),
+      ),
+    );
   }
 
   void _showEditDialog(Player player) {
@@ -451,19 +681,15 @@ class _HomeViewState extends State<HomeView> {
         _showMessage('Court renamed to "$newName".');
       },
       onAssignPlayer: (player, toTeamA, toSlot) {
-        final success = widget.courtController.assignPlayer(
-          courtId: court.id,
+        final success = _assignPlayerToCourt(
+          destinationCourt: court,
           player: player,
           toTeamA: toTeamA,
           toSlot: toSlot,
         );
 
         if (!success) {
-          _showMessage(
-            'Cannot assign player. Check whether the destination slot is '
-            'occupied, the court has started, or the player is already '
-            'assigned to another court.',
-          );
+          _showMessage('Unable to move player.');
         }
 
         return success;
